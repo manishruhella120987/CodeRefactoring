@@ -1,12 +1,20 @@
 package com.tidal.refactoring.playlist.data;
 
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Positive;
 
 public class Track {
 
+	@NotBlank 
     private String title;
+    
+    @Positive
     private float duration;
-
+    
+    @Positive
     private int artistId;
+    
+    @Positive
     private int id;
 
     public Track() {

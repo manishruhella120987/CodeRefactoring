@@ -1,14 +1,27 @@
 package com.tidal.refactoring.playlist.dao;
 
 import com.tidal.refactoring.playlist.data.PlayList;
-import com.tidal.refactoring.playlist.data.PlayListTrack;
+/*import com.tidal.refactoring.playlist.data.PlayListTrack;
 import com.tidal.refactoring.playlist.data.Track;
 
-import java.util.*;
+import java.util.*;*/
 
-/**
- * Class faking the data layer, and returning fake playlists
- */
+/** 
+ * New interface has been declared. In real life scenario this will be implemented 
+ * by class interacting with database or any other backEnd service to retrieve the playList.
+ * */
+public interface PlaylistDaoBean {
+    PlayList getPlaylistByUUID(String uuid);
+}
+
+/** 
+ * Below class is not required as now mocking is handled by MockIto
+ * */
+
+/*
+*//**
+ * Class faking the data layer, and returning fake playLists
+ *//*
 public class PlaylistDaoBean {
 
     private final Map<String, PlayList> playlists = new HashMap<String, PlayList>();
@@ -68,3 +81,4 @@ public class PlaylistDaoBean {
         return track;
     }
 }
+*/

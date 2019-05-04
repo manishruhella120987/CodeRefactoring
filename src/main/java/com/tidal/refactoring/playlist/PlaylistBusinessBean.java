@@ -2,6 +2,7 @@ package com.tidal.refactoring.playlist;
 
 import com.google.inject.Inject; 
 import com.tidal.refactoring.playlist.dao.PlaylistDaoBean;
+import com.tidal.refactoring.playlist.dao.PlayListInputValidator;
 import com.tidal.refactoring.playlist.data.PlayListTrack;
 import com.tidal.refactoring.playlist.data.Track;
 import com.tidal.refactoring.playlist.data.PlayList;
@@ -17,85 +18,78 @@ public class PlaylistBusinessBean {
     public PlaylistBusinessBean(PlaylistDaoBean playlistDaoBean){
         this.playlistDaoBean = playlistDaoBean;
     }
-
-    /**
-     * Add tracks to the index
-     */
-    List<PlayListTrack> addTracks(String uuid, List<Track> tracksToAdd, int toIndex) throws PlaylistException {
+    
+	/**
+	 * Method to add Tracks at a given index 
+	 * and returns Added tracks.
+	 */
+    public List<PlayListTrack> addTracks(String uuid, List<Track> tracksToAdd, int toIndex) throws PlaylistException {
 
         try {
-
             PlayList playList = playlistDaoBean.getPlaylistByUUID(uuid);
-
-            //We do not allow > 500 tracks in new playlists
-            if (playList.getNrOfTracks() + tracksToAdd.size() > 500) {
-                throw new PlaylistException("Playlist cannot have more than " + 500 + " tracks");
+            PlayListInputValidator inputValidator = new PlayListInputValidator();
+            /** If track list to be added is null or playList is null then return empty list */
+            if(!inputValidator.validTracksToBeAdded(tracksToAdd) || !inputValidator.validPlayList(playList)){
+                return Collections.emptyList();
             }
+            inputValidator.validateMaxTracksLimitInPlayList(playList,tracksToAdd);
 
-            // The index is out of bounds, put it in the end of the list.
-            int size = playList.getPlayListTracks() == null ? 0 : playList.getPlayListTracks().size();
-            if (toIndex > size || toIndex == -1) {
-                toIndex = size;
-            }
-
-            if (!validateIndexes(toIndex, playList.getNrOfTracks())) {
-                return Collections.EMPTY_LIST;
-            }
-
-            Set<PlayListTrack> originalSet = playList.getPlayListTracks();
-            List<PlayListTrack> original;
-            if (originalSet == null || originalSet.size() == 0)
-                original = new ArrayList<PlayListTrack>();
-            else
-                original = new ArrayList<PlayListTrack>(originalSet);
-
-            Collections.sort(original);
-
-            List<PlayListTrack> added = new ArrayList<PlayListTrack>(tracksToAdd.size());
-
-            for (Track track : tracksToAdd) {
-                PlayListTrack playlistTrack = new PlayListTrack();
-                playlistTrack.setTrack(track);
-                playlistTrack.setTrackPlaylist(playList);
-                playlistTrack.setDateAdded(new Date());
-                playlistTrack.setTrack(track);
-                playList.setDuration(addTrackDurationToPlaylist(playList, track));
-                original.add(toIndex, playlistTrack);
-                added.add(playlistTrack);
-                toIndex++;
-            }
-
-            int i = 0;
-            for (PlayListTrack track : original) {
-                track.setIndex(i++);
-            }
-
-            playList.getPlayListTracks().clear();
-            playList.getPlayListTracks().addAll(original);
-            playList.setNrOfTracks(original.size());
-
-            return added;
-
+            toIndex = inputValidator.validateAndFixIndex(toIndex, playList);
+            
+            List<PlayListTrack> addedPlayListTracks = new ArrayList<>(tracksToAdd.size());
+            
+			for (Track track : tracksToAdd) {
+				addedPlayListTracks.add(addTrackToPlayList(playList,track,toIndex));
+				toIndex++;
+			}
+            return addedPlayListTracks;
         } catch (Exception e) {
             e.printStackTrace();
+            /** log4j can be used to create Logger and set multiple log levels like error, debug, warning*/
             throw new PlaylistException("Generic error");
         }
     }
-    
-	/**
-	 * Remove the tracks from the playlist located at the sent indexes
-	 */
-	List<PlayListTrack> removeTracks(String uuid, List<Integer> indexes) throws PlaylistException {
-		// TODO
-		return Collections.EMPTY_LIST;
+
+	private PlayListTrack addTrackToPlayList(PlayList playList, Track track, int toIndex) {
+		PlayListTrack playListTrack = PlayListTrack.generateNewPlayListTrack(playList, track);
+		playList.add(toIndex, playListTrack);
+		playList.setDuration(addTrackDurationToPlaylist(playList, track));
+		//playList.setNrOfTracks(playList.getPlayListTracks().size());
+		return playListTrack;
 	}
 
-    private boolean validateIndexes(int toIndex, int length) {
-        return toIndex >= 0 && toIndex <= length;
+	/**
+	 * Method to remove tracks from the playList located at the sent indexes
+	 * @param uuid
+	 * @param indexes
+	 * @return : List of PlaylistTrack
+	 * @throws PlaylistException
+	 */
+	public List<PlayListTrack> removeTracks(String uuid, List<Integer> indexes) throws PlaylistException {
+		PlayListInputValidator inputValidator = new PlayListInputValidator();
+		List<PlayListTrack> removedTracks= new ArrayList<>(indexes.size());
+        PlayList playList = playlistDaoBean.getPlaylistByUUID(uuid);
+        if(!inputValidator.validPlayListForRemoval(playList) ||!inputValidator.validIndexToBeRemoved(indexes)){
+            return Collections.emptyList();
+        }
+        for(Integer index:indexes){
+            if(inputValidator.validIndex(index,playList)){
+            	playList.setDuration(removeTrackDurationFromPlaylist(playList, playList.get(index).getTrack()));    
+            	removedTracks.add(playList.remove(index));
+            }else{
+                throw new PlaylistException("Invalid index "+index+" provided for playlist with id "+uuid);
+            }
+        }
+        return removedTracks;
     }
 
     private float addTrackDurationToPlaylist(PlayList playList, Track track) {
         return (track != null ? track.getDuration() : 0)
                 + (playList != null && playList.getDuration() != null ? playList.getDuration() : 0);
     }
+    
+	private float removeTrackDurationFromPlaylist(PlayList playList, Track track) {
+		return Math.abs((playList != null && playList.getDuration() != null ? playList.getDuration() : 0)
+				- (track != null ? track.getDuration() : 0));
+	}  
 }
